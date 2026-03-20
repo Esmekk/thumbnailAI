@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/genai";
 import { Loader2, Download, Sparkles, Image as ImageIcon, History, Send, Layout, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -59,30 +59,31 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
       
       const fullPrompt = `YouTube thumbnail for a video about: ${topic}. 
       The thumbnail should be high impact and professional. 
       Style requirements: ${selectedStyle.promptSuffix}
       Ensure there is space for bold text if needed. No watermarks. 16:9 aspect ratio.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [{ text: fullPrompt }],
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: "16:9",
-          },
+      const model = ai.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      
+      const response = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+        generationConfig: {
+          responseModalities: ['image', 'text'],
         },
       });
 
       let foundImage = false;
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
+      const result = response.response;
+      const parts = result.candidates?.[0]?.content?.parts || [];
+      
+      for (const part of parts) {
         if (part.inlineData) {
           const base64Data = part.inlineData.data;
-          const url = `data:image/png;base64,${base64Data}`;
+          const mimeType = part.inlineData.mimeType || 'image/png';
+          const url = `data:${mimeType};base64,${base64Data}`;
           setImageUrl(url);
           setHistory(prev => [url, ...prev].slice(0, 8));
           foundImage = true;
